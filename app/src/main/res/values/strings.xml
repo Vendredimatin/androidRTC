@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AndroidRTC</string>
+    <string name="host">13.68.204.82</string>
+    <string name="port">8080</string>
+    <string name="action_settings">Options</string>
+    <string name="dialog_calling">%1$s is calling ……</string>
+    <string name="dialog_answer">Answer</string>
+    <string name="dialog_hangup">Hangup</string>
+    <string name="front_camera">Front Camera</string>
+    <string name="back_camera">Back Camera</string>
+    <string name="gps">GPS</string>
+    <string name="screen">Screen</string>
+    <string name="title">Register and share your devices</string>
+    <string name="regserver"></string>
+    <string name="regport"></string>
+    <string name="register">Register</string>
+</resources>
