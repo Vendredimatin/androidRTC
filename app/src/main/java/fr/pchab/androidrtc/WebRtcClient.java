@@ -36,8 +36,10 @@ import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 
 
 import android.content.Context;
@@ -205,10 +207,75 @@ public class WebRtcClient {
         };
     }
 
-    public class Peer implements SdpObserver, PeerConnection.Observer {
+    public class Peer implements SdpObserver, PeerConnection.Observer, DataChannel.Observer {
         public PeerConnection pc;
         public String id;
         public int endPoint;
+        public DataChannel dc;
+
+        public Peer(String id, int endPoint) {
+            Log.d(TAG, "new Peer: " + id + " " + endPoint);
+            this.pc = factory.createPeerConnection(iceServers, mPeerConnConstraints, this);
+            this.id = id;
+            this.endPoint = endPoint;
+            pc.addStream(mLocalMediaStream); //, new MediaConstraints()
+
+            /*
+            DataChannel.Init 可配参数说明：
+            ordered：是否保证顺序传输；
+            maxRetransmitTimeMs：重传允许的最长时间；
+            maxRetransmits：重传允许的最大次数；
+             */
+           /* DataChannel.Init init = new DataChannel.Init();
+            init.ordered = true;
+            dc = pc.createDataChannel("dataChannel", init);
+            Log.i("dataChannel", "dataChannel create");*/
+        }
+
+        public void sendDataChannelMessage(String message) {
+            byte[] msg = message.getBytes();
+            DataChannel.Buffer buffer = new DataChannel.Buffer(
+                    ByteBuffer.wrap(msg),
+                    false);
+            dc.send(buffer);
+        }
+
+        public void release() {
+            pc.dispose();
+            dc.close();
+            dc.dispose();
+        }
+
+        //DataChannel.Observer----------------------------------------------------------------------
+
+        @Override
+        public void onBufferedAmountChange(long l) {
+
+        }
+
+        @Override
+        public void onStateChange() {
+            Log.i("dataChannel", "readyState:"+ dc.state());
+        }
+
+        @Override
+        public void onMessage(DataChannel.Buffer buffer) {
+            ByteBuffer data = buffer.data;
+            byte[] bytes = new byte[data.capacity()];
+            data.get(bytes);
+            String msg = new String(bytes);
+            System.out.println("dataChannel receive:" + msg);
+            Log.i("dataChannel", "dataChannel receive:" + msg);
+            Log.i("dataChannel", "peerSize:"+ peers.size());
+            // peers中存着远端Web的ID
+            for (Map.Entry<String,Peer> entry :peers.entrySet()) {
+                Log.i("dataChannel", "peerID:"+entry.getKey());
+                Peer peer = entry.getValue();
+                peer.sendDataChannelMessage("hello,"+  entry.getKey() +"! i have received!");
+            }
+        }
+
+        //--------------------------------------------------
 
         @Override
         public void onCreateSuccess(final SessionDescription sdp) {
@@ -295,6 +362,8 @@ public class WebRtcClient {
 
         @Override
         public void onDataChannel(DataChannel dataChannel) {
+            dc = dataChannel;
+            dataChannel.registerObserver(this);
         }
 
         @Override
@@ -302,13 +371,7 @@ public class WebRtcClient {
 
         }
 
-        public Peer(String id, int endPoint) {
-            Log.d(TAG, "new Peer: " + id + " " + endPoint);
-            this.pc = factory.createPeerConnection(iceServers, mPeerConnConstraints, this);
-            this.id = id;
-            this.endPoint = endPoint;
-            pc.addStream(mLocalMediaStream); //, new MediaConstraints()
-        }
+
     }
 
     private Peer addPeer(String id, int endPoint) {
