@@ -215,6 +215,9 @@ public class WebRtcClient {
 
         public Peer(String id, int endPoint) {
             Log.d(TAG, "new Peer: " + id + " " + endPoint);
+            Log.i("dataChannel", "new Peer: " + id + " " + endPoint);
+            Log.i("dataChannel", "new peerConnection: ");
+
             this.pc = factory.createPeerConnection(iceServers, mPeerConnConstraints, this);
             this.id = id;
             this.endPoint = endPoint;
@@ -226,10 +229,10 @@ public class WebRtcClient {
             maxRetransmitTimeMs：重传允许的最长时间；
             maxRetransmits：重传允许的最大次数；
              */
-           /* DataChannel.Init init = new DataChannel.Init();
+            DataChannel.Init init = new DataChannel.Init();
             init.ordered = true;
             dc = pc.createDataChannel("dataChannel", init);
-            Log.i("dataChannel", "dataChannel create");*/
+            Log.i("dataChannel", "dataChannel create");
         }
 
         public void sendDataChannelMessage(String message) {
@@ -264,7 +267,7 @@ public class WebRtcClient {
             byte[] bytes = new byte[data.capacity()];
             data.get(bytes);
             String msg = new String(bytes);
-            System.out.println("dataChannel receive:" + msg);
+            Log.i("dataChannel","dataChannel receive:" + msg);
             Log.i("dataChannel", "dataChannel receive:" + msg);
             Log.i("dataChannel", "peerSize:"+ peers.size());
             // peers中存着远端Web的ID
@@ -362,8 +365,10 @@ public class WebRtcClient {
 
         @Override
         public void onDataChannel(DataChannel dataChannel) {
+            Log.i("dataChannel", "receive" + dataChannel.id());
             dc = dataChannel;
-            dataChannel.registerObserver(this);
+            dc.registerObserver(this);
+            Log.i("dataChannel" ,"连接已建立");
         }
 
         @Override
