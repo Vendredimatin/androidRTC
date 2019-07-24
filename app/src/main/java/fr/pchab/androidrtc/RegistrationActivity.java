@@ -6,18 +6,25 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.hardware.fingerprint.FingerprintManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.Toast;
 
 import com.loopj.android.http.JsonHttpResponseHandler;
@@ -33,6 +40,7 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Date;
+import java.util.List;
 
 import cz.msebera.android.httpclient.Header;
 
@@ -43,13 +51,16 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     private WebRtcClient mWebRtcClientCamera;
     private WebRtcClient mWebRtcClientScreen;
+    private WebRtcClient mClient;
+    private double latitude=0.0,longitude =0.0;
 
 
     private static Intent mMediaProjectionPermissionResultData;
     private static int mMediaProjectionPermissionResultCode;
     private static final int CAPTURE_PERMISSION_REQUEST_CODE = 1;
 
-    public static String STREAM_NAME_PREFIX = "android_screen_stream";
+    public static String STREAM_NAME_PREFIX = "android_stream";
+
    // public static String STREAM_NAME_PREFIX = "android_camera_stream";
    // public static String STREAM_NAME_PREFIX = "android_camera_stream";
    // public static String STREAM_NAME_PREFIX = "android_camera_stream";
@@ -60,7 +71,11 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     private Button regButton;
     private EditText serverEditText;
+    private Switch gpsSwitch,screenSwitch,frontSwitch,backSwitch;
+    private Button punchButton;
 
+    private LocationManager locationManager;
+    private LocationListener locationListener;
 
     private boolean cameraOn;
     private boolean screenOn;
@@ -91,6 +106,37 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
         regButton = (Button) findViewById(R.id.button);
         serverEditText = (EditText) findViewById(R.id.edit_username);
 
+        punchButton=(Button)findViewById(R.id.button2);
+        gpsSwitch=(Switch)findViewById(R.id.GPSSwitch);
+
+        punchButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent iExp = new Intent(RegistrationActivity.this, FingerPrint.class); //TODO  Replace 'ActivityToCall' with the class name of the activity being called
+
+                startActivity(iExp);
+//                public static FingerprintManager getFingerprintManager(Context context) {
+//                    FingerprintManager fingerprintManager = null;
+//                    try {
+//                        fingerprintManager = (FingerprintManager) context.getSystemService(Context.FINGERPRINT_SERVICE);
+//                    } catch (Throwable e) {
+//                        L.v("have not class FingerprintManager");
+//                    }
+//                    return fingerprintManager;
+//                }
+            }
+        });
+        gpsSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+             @Override
+             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                 // TODO Auto-generated method stub
+                 if (isChecked) {
+                     startGPSCapture();//打开GPS共享
+                 } else {
+                     endGPSCapture();// 关闭GPS共享
+                 }
+             }
+        });
 /*
         new Thread(new Runnable() {
                   @Override
@@ -165,7 +211,81 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     }
 
+    private void startGPSCapture()
+            throws SecurityException{
+    //获取定位服务
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        locationListener = new LocationListener() {
+            // Provider的状态在可用、暂时不可用和无服务三个状态直接切换时触发此函数
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+            }
 
+            // Provider被enable时触发此函数，比如GPS被打开
+            @Override
+            public void onProviderEnabled(String provider) {
+            }
+
+            // Provider被disable时触发此函数，比如GPS被关闭
+            @Override
+            public void onProviderDisabled(String provider) {
+            }
+
+            //当坐标改变时触发此函数，如果Provider传进相同的坐标，它就不会被触发
+            @Override
+            public void onLocationChanged(Location location) {
+                if (location != null) {
+                    latitude=location.getLatitude();
+                    longitude=location.getLongitude();
+                    mClient.setLocation(latitude,longitude);
+                    Log.e("Map", "Location changed : Lat: "
+                            + location.getLatitude() + " Lng: "
+                            + location.getLongitude());
+                    mClient.sendGPS();
+                }
+            }
+        };
+        //获取当前可用的位置控制器
+        List<String> providers = locationManager.getProviders(true);
+        if(providers.size()==0){
+            Toast.makeText(this, "请检查网络或GPS是否打开",
+                    Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
+            return;
+        }
+        Location bestLocation = null;
+        String bestProvider="";
+        for (String provider : providers) {
+            Location l = locationManager.getLastKnownLocation(provider);
+            if (l == null) {
+                continue;
+            }
+            if (bestLocation == null || l.getAccuracy() < bestLocation.getAccuracy()) {
+                // Found best last known location: %s", l);
+                bestLocation = l;
+                bestProvider=provider;
+            }
+        }
+        if (bestLocation != null) {
+            //获取当前位置，这里只用到了经纬度
+            latitude=bestLocation.getLatitude();
+            longitude=bestLocation.getLongitude();
+        }
+        //绑定定位事件，监听位置是否改变
+        //第一个参数为控制器类型第二个参数为监听位置变化的时间间隔（单位：毫秒）
+        //第三个参数为位置变化的间隔（单位：米）第四个参数为位置监听器
+        locationManager.requestLocationUpdates(bestProvider, 2000, 2,locationListener);
+        startScreenCapture();
+//        mClient.sendGPS(latitude,longitude);
+//        mClient=new WebRtcClient(getApplicationContext(),this);
+    }
+    private void endGPSCapture(){
+        //关闭时解除监听器
+            if (locationManager != null) {
+                locationManager.removeUpdates(locationListener);
+            }
+    }
     private void startScreenCapture() {
         MediaProjectionManager mediaProjectionManager =
                 (MediaProjectionManager) getApplication().getSystemService(
@@ -185,9 +305,10 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
                         0,
                         "OPUS", false, false, false, false, false, false, false, false, null);
 //        mWebRtcClient = new WebRtcClient(getApplicationContext(), this, pipRenderer, fullscreenRenderer, createScreenCapturer(), peerConnectionParameters);
-      //  mWebRtcClientCamera = new WebRtcClient(getApplicationContext(), this, createVideoCapturer(), peerConnectionParameters);
-        mWebRtcClientScreen = new WebRtcClient(getApplicationContext(), this, createScreenCapturer(), peerConnectionParameters);
-
+//        mWebRtcClientCamera = new WebRtcClient(getApplicationContext(), this, createVideoCapturer(), peerConnectionParameters);
+//        mWebRtcClientScreen = new WebRtcClient(getApplicationContext(), this, createScreenCapturer(), peerConnectionParameters);
+        mClient=new WebRtcClient(getApplicationContext(),this,createScreenCapturer(),peerConnectionParameters);
+        mClient.setLocation(latitude,longitude);
     }
 
     private VideoCapturer createVideoCapturer() {
@@ -271,8 +392,9 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     @Override
     public void onReady(String remoteId) {
-    //    mWebRtcClientCamera.start(STREAM_NAME_PREFIX);
-        mWebRtcClientScreen.start(STREAM_NAME_PREFIX);
+        mClient.start(STREAM_NAME_PREFIX);
+//        mWebRtcClientCamera.start(STREAM_NAME_PREFIX);
+//        mWebRtcClientScreen.start(STREAM_NAME_PREFIX);
 
     }
 

@@ -49,6 +49,10 @@ import com.github.nkzawa.socketio.client.IO;
 import com.github.nkzawa.socketio.client.Socket;
 
 public class WebRtcClient {
+    private double latitude=0.0,longitude=0.0;
+    public void setLocation(double lat,double lon){
+        latitude=lat;longitude=lon;
+    }
 
     public static final String VIDEO_TRACK_ID = "ARDAMSv0";
     private final static String TAG = "WebRtcClient";
@@ -67,6 +71,11 @@ public class WebRtcClient {
     MessageHandler messageHandler = new MessageHandler();
     Context mContext;
 
+    public void sendGPS() {
+        for (Peer peer : peers.values()) {
+            peer.sendDataChannelMessage(String.valueOf(latitude)+","+String.valueOf(longitude));
+        }
+    }
     /**
      * Implement this interface to be notified of events.
      */
@@ -274,6 +283,9 @@ public class WebRtcClient {
             for (Map.Entry<String,Peer> entry :peers.entrySet()) {
                 Log.i("dataChannel", "peerID:"+entry.getKey());
                 Peer peer = entry.getValue();
+                if(msg.equals("GPS"))
+                    peer.sendDataChannelMessage(String.valueOf(latitude)+","+String.valueOf(longitude));
+                else
                 peer.sendDataChannelMessage("hello,"+  entry.getKey() +"! i have received!");
             }
         }
@@ -392,6 +404,41 @@ public class WebRtcClient {
         peer.pc.close();
         peers.remove(peer.id);
         endPoints[peer.endPoint] = false;
+    }
+    public WebRtcClient(Context context, RtcListener listener){
+        mContext = context;
+        mListener = listener;
+        PeerConnectionFactory.initializeAndroidGlobals(mContext, false,false,false);
+        factory = new PeerConnectionFactory();
+        String host = "http://" + context.getString(R.string.host) + ":" + context.getString(R.string.port) + "/";
+        try {
+            mSocket = IO.socket(host);
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
+        mSocket.on("id", messageHandler.onId);
+        mSocket.on("message", messageHandler.onMessage);
+        mSocket.on(Socket.EVENT_CONNECT, new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                Log.d(TAG, "socket state connect");
+            }
+        });
+        mSocket.on(Socket.EVENT_DISCONNECT, new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                Log.d(TAG, "socket state disconnect");
+            }
+        });
+        mSocket.on(Socket.EVENT_ERROR, new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                Log.d(TAG, "socket state error");
+            }
+        });
+        mSocket.connect();
+        Log.d(TAG, "socket start connect");
+        iceServers.add(new PeerConnection.IceServer("turn:numb.viagenie.ca","webrtc@live.com","muazkh"));
     }
 
     public WebRtcClient(Context context, RtcListener listener, VideoCapturer capturer, PeerConnectionClient.PeerConnectionParameters params) {
