@@ -21,6 +21,7 @@ import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONString;
 import org.webrtc.AudioSource;
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
@@ -187,6 +188,7 @@ public class WebRtcClient {
                     // if peer is unknown, try to add him
                     if (!peers.containsKey(from)) {
                         // if MAX_PEER is reach, ignore the call
+                        Log.i(TAG, "don't contain peer:" + from);
                         int endPoint = findEndPoint();
                         if (endPoint != MAX_PEER) {
                             Peer peer = addPeer(from, endPoint);
@@ -283,8 +285,19 @@ public class WebRtcClient {
             for (Map.Entry<String,Peer> entry :peers.entrySet()) {
                 Log.i("dataChannel", "peerID:"+entry.getKey());
                 Peer peer = entry.getValue();
-                if(msg.equals("GPS"))
-                    peer.sendDataChannelMessage(String.valueOf(latitude)+","+String.valueOf(longitude));
+                if(msg.equals("GPS")){
+                    JSONObject json = new JSONObject();
+                    try {
+                        json.put("type", "GPS");
+                        json.put("latitude", latitude);
+                        json.put("longitude", longitude);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    peer.sendDataChannelMessage(json.toString());
+                    Log.i("dataChannel", latitude+","+longitude);
+
+                }
                 else
                 peer.sendDataChannelMessage("hello,"+  entry.getKey() +"! i have received!");
             }
