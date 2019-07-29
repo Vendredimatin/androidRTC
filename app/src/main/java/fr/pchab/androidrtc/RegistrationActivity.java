@@ -169,18 +169,6 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 //                }
             }
         });
-        screenSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked){
-                if (isChecked) {
-                    try {
-                        mClient.changeCapturer(screenCapturer);
-                    }catch (Exception e){
-                        e.printStackTrace();
-                    }
-                }
-            }
-        });
         gpsSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
              @Override
              public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -192,23 +180,36 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
                  }
              }
         });
+        screenSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked){
+                if (isChecked) {
+                    mClient.setEnabled(true,"screen");
+                }
+                else{
+                    mClient.setEnabled(false,"screen");
+                }
+            }
+        });
         frontSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                try {
-                    mClient.changeCapturer(frontCapturer);
-                }catch (Exception e){
-                    e.printStackTrace();
+                if(isChecked){
+                    mClient.setEnabled(true,"front");
+                }
+                else{
+                    mClient.setEnabled(false,"front");
                 }
             }
         });
         backSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                try {
-                    mClient.changeCapturer(backCapturer);
-                }catch (Exception e){
-                    e.printStackTrace();
+                if(isChecked){
+                    mClient.setEnabled(true,"back");
+                }
+                else{
+                    mClient.setEnabled(false,"back");
                 }
             }
         });
@@ -337,7 +338,8 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 //        curCapturer=createVideoCapturer();
         initScreenCapturer();
         initCameraCapturer(new Camera1Enumerator(false));
-        mClient=new WebRtcClient(getApplicationContext(),this,screenCapturer,peerConnectionParameters);
+        VideoCapturer[] l={screenCapturer,frontCapturer,backCapturer};
+        mClient=new WebRtcClient(getApplicationContext(),this,l,peerConnectionParameters);
 
     }
 

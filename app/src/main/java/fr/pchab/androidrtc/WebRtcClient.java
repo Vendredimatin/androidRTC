@@ -35,6 +35,8 @@ import org.webrtc.SessionDescription;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
+import org.webrtc.AudioSource;
+import org.webrtc.AudioTrack;
 
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
@@ -55,7 +57,7 @@ public class WebRtcClient {
         latitude=lat;longitude=lon;
     }
 
-    public static final String VIDEO_TRACK_ID = "ARDAMSv0";
+    public static final String SCREEN_TRACK_ID = "ARDAMSv0",FRONT_TRACK_ID="ARDAMSv1",BACK_TRACK_ID="ARDAMSv2";
     private final static String TAG = "WebRtcClient";
     private final static int MAX_PEER = 2;
     private boolean[] endPoints = new boolean[MAX_PEER];
@@ -65,12 +67,16 @@ public class WebRtcClient {
     private PeerConnectionClient.PeerConnectionParameters mPeerConnParams;
     private MediaConstraints mPeerConnConstraints = new MediaConstraints();
     private MediaStream mLocalMediaStream;
-    private VideoSource mVideoSource;
+    private VideoSource mScreenSource,mFrontSource,mBackSource;
+    private VideoTrack mSreenTrack,mFrontTrack,mBackTrack;
+    private AudioSource mAudioSource;
+    private AudioTrack mAudioTrack;
     private RtcListener mListener;
     private Socket mSocket;
-    VideoCapturer videoCapturer;
+    VideoCapturer screenCapturer,frontCapturer,backCapturer;
     MessageHandler messageHandler = new MessageHandler();
     Context mContext;
+
 
     public void sendGPS() {
         for (Peer peer : peers.values()) {
@@ -192,7 +198,7 @@ public class WebRtcClient {
                         int endPoint = findEndPoint();
                         if (endPoint != MAX_PEER) {
                             Peer peer = addPeer(from, endPoint);
-                            peer.pc.addStream(mLocalMediaStream);
+//                            peer.pc.addStream(mLocalMediaStream);
                             commandMap.get(type).execute(from, payload);
                         }
                     } else {
@@ -297,6 +303,9 @@ public class WebRtcClient {
                     peer.sendDataChannelMessage(json.toString());
                     Log.i("dataChannel", latitude+","+longitude);
 
+                }
+                else if((mSreenTrack.enabled()&&msg.equals("screen"))||(mFrontTrack.enabled()&&msg.equals("front"))||(mBackTrack.enabled()&&msg.equals("back"))){
+                    switchVideoTo(msg);
                 }
                 else
                 peer.sendDataChannelMessage("hello,"+  entry.getKey() +"! i have received!");
@@ -419,11 +428,13 @@ public class WebRtcClient {
         endPoints[peer.endPoint] = false;
     }
 
-    public WebRtcClient(Context context, RtcListener listener, VideoCapturer capturer, PeerConnectionClient.PeerConnectionParameters params) {
+    public WebRtcClient(Context context, RtcListener listener, VideoCapturer[] capturerList, PeerConnectionClient.PeerConnectionParameters params) {
         mContext = context;
         mListener = listener;
         mPeerConnParams = params;
-        videoCapturer = capturer;
+        screenCapturer=capturerList[0];
+        frontCapturer=capturerList[1];
+        backCapturer=capturerList[2];
         PeerConnectionFactory.initializeAndroidGlobals(mContext, true, true,
                 params.videoCodecHwAcceleration);
         factory = new PeerConnectionFactory();
@@ -475,8 +486,14 @@ public class WebRtcClient {
         if (factory != null) {
             factory.dispose();
         }
-        if (mVideoSource != null) {
-            mVideoSource.dispose();
+        if (mScreenSource != null) {
+            mScreenSource.dispose();
+        }
+        if (mFrontSource != null) {
+            mFrontSource.dispose();
+        }
+        if (mBackSource != null) {
+            mBackSource.dispose();
         }
 //        mSocket.disconnect();
 //        mSocket.close();
@@ -515,20 +532,62 @@ public class WebRtcClient {
         videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair("minFrameRate", Integer.toString(mPeerConnParams.videoFps)));
 
 //        VideoCapturer capturer = createScreenCapturer();
-        mVideoSource = factory.createVideoSource(videoCapturer);
-        videoCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
-        VideoTrack localVideoTrack = factory.createVideoTrack(VIDEO_TRACK_ID, mVideoSource);
-        localVideoTrack.setEnabled(true);
-        mLocalMediaStream.addTrack(factory.createVideoTrack("ARDAMSv0", mVideoSource));
-        AudioSource audioSource = factory.createAudioSource(new MediaConstraints());
-        mLocalMediaStream.addTrack(factory.createAudioTrack("ARDAMSa0", audioSource));
+        mScreenSource=factory.createVideoSource(screenCapturer);
+        mFrontSource=factory.createVideoSource(frontCapturer);
+        mBackSource=factory.createVideoSource(backCapturer);
+
+        screenCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
+        frontCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
+        backCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
+
+        mSreenTrack=factory.createVideoTrack(SCREEN_TRACK_ID,mScreenSource);
+        mFrontTrack=factory.createVideoTrack(FRONT_TRACK_ID,mFrontSource);
+        mBackTrack=factory.createVideoTrack(BACK_TRACK_ID,mBackSource);
+
+//        mLocalMediaStream.addTrack(mSreenTrack);
+//        mLocalMediaStream.addTrack(mFrontTrack);
+//        mLocalMediaStream.addTrack(mBackTrack);
+//        mLocalMediaStream.addTrack(factory.createVideoTrack("ARDAMSv0", mVideoSource));
+        mAudioSource = factory.createAudioSource(new MediaConstraints());
+        mLocalMediaStream.addTrack(factory.createAudioTrack("ARDAMSa0", mAudioSource));
 //        mLocalMediaStream.videoTracks.get(0).addRenderer(new VideoRenderer(mLocalRender));
 //        mListener.onLocalStream(mLocalMediaStream);
         mListener.onStatusChanged("STREAMING");
     }
-    public void changeCapturer(VideoCapturer capturer)throws Exception{
-        videoCapturer=capturer;
-        initScreenCapturStream();
+    public void switchVideoTo(String type){
+        switch (type){
+            case"screen":
+                mLocalMediaStream.addTrack(mSreenTrack);
+                mLocalMediaStream.removeTrack(mFrontTrack);
+                mLocalMediaStream.removeTrack(mBackTrack);
+                break;
+            case"front":
+                try{backCapturer.stopCapture();}catch (Exception e){e.printStackTrace();}
+                frontCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
+//                mFrontTrack.setEnabled(true);
+                mLocalMediaStream.removeTrack(mSreenTrack);
+                mLocalMediaStream.addTrack(mFrontTrack);
+                mLocalMediaStream.removeTrack(mBackTrack);
+                break;
+            case"back":
+                try{frontCapturer.stopCapture();}catch (Exception e){e.printStackTrace();}
+                backCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
+                mLocalMediaStream.removeTrack(mSreenTrack);
+                mLocalMediaStream.removeTrack(mFrontTrack);
+//                mBackTrack.setEnabled(true);
+                mLocalMediaStream.addTrack(mBackTrack);
+        }
+    }
+    public void setEnabled(boolean b,String type){
+        switch (type){
+            case "screen":
+                mSreenTrack.setEnabled(b);break;
+            case "front":
+                mFrontTrack.setEnabled(b);break;
+            case "back":
+                mBackTrack.setEnabled(b);break;
+            default:break;
+        }
     }
 
 }
