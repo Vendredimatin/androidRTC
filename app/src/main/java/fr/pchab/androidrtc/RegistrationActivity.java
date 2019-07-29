@@ -1,12 +1,8 @@
 package fr.pchab.androidrtc;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.hardware.fingerprint.FingerprintManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -34,18 +30,14 @@ import org.json.JSONObject;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.ScreenCapturerAndroid;
+import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.VideoCapturer;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Date;
 import java.util.List;
 
 import cz.msebera.android.httpclient.Header;
 
 import static android.content.ContentValues.TAG;
-import static android.os.SystemClock.sleep;
 
 public class RegistrationActivity extends Activity implements WebRtcClient.RtcListener {
 
@@ -54,12 +46,12 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
     private WebRtcClient mClient;
     private double latitude=0.0,longitude =0.0;
 
-
     private static Intent mMediaProjectionPermissionResultData;
     private static int mMediaProjectionPermissionResultCode;
     private static final int CAPTURE_PERMISSION_REQUEST_CODE = 1;
 
     public static String STREAM_NAME_PREFIX = "android_stream";
+
 
    // public static String STREAM_NAME_PREFIX = "android_camera_stream";
    // public static String STREAM_NAME_PREFIX = "android_camera_stream";
@@ -76,6 +68,8 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     private LocationManager locationManager;
     private LocationListener locationListener;
+    private static VideoCapturer frontCapturer,backCapturer,screenCapturer;
+
 
     private boolean cameraOn;
     private boolean screenOn;
@@ -83,6 +77,8 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+
         super.onCreate(savedInstanceState);
         Intent intent = new Intent(this, LongRunningService.class);
 
@@ -107,12 +103,59 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
         serverEditText = (EditText) findViewById(R.id.edit_username);
 
         punchButton=(Button)findViewById(R.id.button2);
+        screenSwitch=(Switch)findViewById(R.id.screenSwitch);
         gpsSwitch=(Switch)findViewById(R.id.GPSSwitch);
+        frontSwitch=(Switch)findViewById(R.id.frontCameraSwitch);
+        backSwitch=(Switch)findViewById(R.id.backCameraSwitch);
 
+        regButton.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+
+                final String serverAddr = serverEditText.getText().toString();
+
+                if (serverAddr.isEmpty()) {
+                    // TODO:
+                    //return;
+                }
+
+
+                // call register API
+                JSONObject jsonParams = new JSONObject();
+                try {
+                    jsonParams.put("clientId", "andriod");
+                    jsonParams.put("devId", "screen");
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                RestClient.post(getApplicationContext(), "register", jsonParams, new JsonHttpResponseHandler() {
+                    @Override
+                    public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                        report("RRRRRR");
+                    }
+
+                    @Override
+                    public void onFailure(int statusCode, Header[] headers, Throwable error, JSONObject response) {
+                        Log.i("HTTP", "onFailure: " + response);
+                    }
+                });
+
+
+                // WebRTC
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    startScreenCapture();
+                } else {
+                    // shouldn't reach here
+                    init();
+                }
+            }
+        });
         punchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent iExp = new Intent(RegistrationActivity.this, FingerPrint.class); //TODO  Replace 'ActivityToCall' with the class name of the activity being called
+                Intent iExp = new Intent(RegistrationActivity.this, FingerPrintActivity.class);
 
                 startActivity(iExp);
 //                public static FingerprintManager getFingerprintManager(Context context) {
@@ -126,16 +169,48 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 //                }
             }
         });
+        screenSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked){
+                if (isChecked) {
+                    try {
+                        mClient.changeCapturer(screenCapturer);
+                    }catch (Exception e){
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
         gpsSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
              @Override
              public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                 // TODO Auto-generated method stub
                  if (isChecked) {
                      startGPSCapture();//打开GPS共享
+                     mClient.setLocation(latitude,longitude);
                  } else {
                      endGPSCapture();// 关闭GPS共享
                  }
              }
+        });
+        frontSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                try {
+                    mClient.changeCapturer(frontCapturer);
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+            }
+        });
+        backSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                try {
+                    mClient.changeCapturer(backCapturer);
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+            }
         });
 /*
         new Thread(new Runnable() {
@@ -162,52 +237,6 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
                }).start();
 */
 
-        regButton.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-
-                final String serverAddr = serverEditText.getText().toString();
-
-                if (serverAddr.isEmpty()) {
-                    // TODO:
-                    //return;
-                }
-
-
-                // TODO:
-                // call register API
-                JSONObject jsonParams = new JSONObject();
-                try {
-                    jsonParams.put("clientId", "andriod");
-                    jsonParams.put("devId", "screen");
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-
-                RestClient.post(getApplicationContext(), "register", jsonParams, new JsonHttpResponseHandler() {
-                    @Override
-                    public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
-                        report("RRRRRR");
-                    }
-
-                    @Override
-                    public void onFailure(int statusCode, Header[] headers, Throwable error, JSONObject response) {
-                        Log.i("HTTP", "onFailure: " + response);
-                    }
-                });
-
-
-                // TODO:
-                // WebRTC
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    startScreenCapture();
-                } else {
-                    // shouldn't reach here
-                    init();
-                }
-            }
-        });
 
     }
 
@@ -276,9 +305,7 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
         //第一个参数为控制器类型第二个参数为监听位置变化的时间间隔（单位：毫秒）
         //第三个参数为位置变化的间隔（单位：米）第四个参数为位置监听器
         locationManager.requestLocationUpdates(bestProvider, 2000, 2,locationListener);
-        startScreenCapture();
-//        mClient.sendGPS(latitude,longitude);
-//        mClient=new WebRtcClient(getApplicationContext(),this);
+//        startScreenCapture();
     }
     private void endGPSCapture(){
         //关闭时解除监听器
@@ -307,51 +334,51 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 //        mWebRtcClient = new WebRtcClient(getApplicationContext(), this, pipRenderer, fullscreenRenderer, createScreenCapturer(), peerConnectionParameters);
 //        mWebRtcClientCamera = new WebRtcClient(getApplicationContext(), this, createVideoCapturer(), peerConnectionParameters);
 //        mWebRtcClientScreen = new WebRtcClient(getApplicationContext(), this, createScreenCapturer(), peerConnectionParameters);
-        mClient=new WebRtcClient(getApplicationContext(),this,createScreenCapturer(),peerConnectionParameters);
-        mClient.setLocation(latitude,longitude);
+//        curCapturer=createVideoCapturer();
+        initScreenCapturer();
+        initCameraCapturer(new Camera1Enumerator(false));
+        mClient=new WebRtcClient(getApplicationContext(),this,screenCapturer,peerConnectionParameters);
+
     }
 
-    private VideoCapturer createVideoCapturer() {
-        VideoCapturer videoCapturer;
-        videoCapturer = createCameraCapturer(new Camera1Enumerator(false));
-        return videoCapturer;
+    private void initVideoCapturer() {
+//        VideoCapturer videoCapturer;
+//        videoCapturer = initCameraCapturer(new Camera1Enumerator(false));
+        //return videoCapturer;
     }
 
-    private VideoCapturer createCameraCapturer(CameraEnumerator enumerator) {
+    private void initCameraCapturer(CameraEnumerator enumerator) {
         final String[] deviceNames = enumerator.getDeviceNames();
-
-        // Trying to find a front facing camera!
+                // Trying to find a front facing camera!
         for (String deviceName : deviceNames) {
             if (enumerator.isFrontFacing(deviceName)) {
                 VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
 
                 if (videoCapturer != null) {
-                    return videoCapturer;
+                    frontCapturer=videoCapturer;break;
                 }
             }
         }
-
         // We were not able to find a front cam. Look for other cameras
         for (String deviceName : deviceNames) {
             if (!enumerator.isFrontFacing(deviceName)) {
                 VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
                 if (videoCapturer != null) {
-                    return videoCapturer;
+                    backCapturer=videoCapturer;return;
                 }
             }
         }
 
-        return null;
     }
 
 
    // @TargetApi(21)
-    private VideoCapturer createScreenCapturer() {
+    private void initScreenCapturer() {
         if (mMediaProjectionPermissionResultCode != Activity.RESULT_OK) {
             report("User didn't give permission to capture the screen.");
-            return null;
+            return;
         }
-        return new ScreenCapturerAndroid(
+        screenCapturer= new ScreenCapturerAndroid(
                 mMediaProjectionPermissionResultData, new MediaProjection.Callback() {
             @Override
             public void onStop() {

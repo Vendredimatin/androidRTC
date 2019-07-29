@@ -418,41 +418,6 @@ public class WebRtcClient {
         peers.remove(peer.id);
         endPoints[peer.endPoint] = false;
     }
-    public WebRtcClient(Context context, RtcListener listener){
-        mContext = context;
-        mListener = listener;
-        PeerConnectionFactory.initializeAndroidGlobals(mContext, false,false,false);
-        factory = new PeerConnectionFactory();
-        String host = "http://" + context.getString(R.string.host) + ":" + context.getString(R.string.port) + "/";
-        try {
-            mSocket = IO.socket(host);
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-        mSocket.on("id", messageHandler.onId);
-        mSocket.on("message", messageHandler.onMessage);
-        mSocket.on(Socket.EVENT_CONNECT, new Emitter.Listener() {
-            @Override
-            public void call(Object... args) {
-                Log.d(TAG, "socket state connect");
-            }
-        });
-        mSocket.on(Socket.EVENT_DISCONNECT, new Emitter.Listener() {
-            @Override
-            public void call(Object... args) {
-                Log.d(TAG, "socket state disconnect");
-            }
-        });
-        mSocket.on(Socket.EVENT_ERROR, new Emitter.Listener() {
-            @Override
-            public void call(Object... args) {
-                Log.d(TAG, "socket state error");
-            }
-        });
-        mSocket.connect();
-        Log.d(TAG, "socket start connect");
-        iceServers.add(new PeerConnection.IceServer("turn:numb.viagenie.ca","webrtc@live.com","muazkh"));
-    }
 
     public WebRtcClient(Context context, RtcListener listener, VideoCapturer capturer, PeerConnectionClient.PeerConnectionParameters params) {
         mContext = context;
@@ -561,6 +526,9 @@ public class WebRtcClient {
 //        mListener.onLocalStream(mLocalMediaStream);
         mListener.onStatusChanged("STREAMING");
     }
-
+    public void changeCapturer(VideoCapturer capturer)throws Exception{
+        videoCapturer=capturer;
+        initScreenCapturStream();
+    }
 
 }
