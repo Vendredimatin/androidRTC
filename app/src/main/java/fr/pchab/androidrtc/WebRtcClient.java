@@ -307,8 +307,16 @@ public class WebRtcClient {
                 else if((mSreenTrack.enabled()&&msg.equals("screen"))||(mFrontTrack.enabled()&&msg.equals("front"))||(mBackTrack.enabled()&&msg.equals("back"))){
                     switchVideoTo(msg);
                 }
-                else
-                peer.sendDataChannelMessage("hello,"+  entry.getKey() +"! i have received!");
+                else{
+                    JSONObject json = new JSONObject();
+                    try {
+                        json.put("type", "SUCCESS");
+                        json.put("msg", "hello,"+  entry.getKey() +"! i have received!");
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    peer.sendDataChannelMessage(json.toString());
+                }
             }
         }
 
