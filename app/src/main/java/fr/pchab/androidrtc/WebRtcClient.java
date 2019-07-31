@@ -291,7 +291,7 @@ public class WebRtcClient {
             for (Map.Entry<String,Peer> entry :peers.entrySet()) {
                 Log.i("dataChannel", "peerID:"+entry.getKey());
                 Peer peer = entry.getValue();
-                if(msg.equals("GPS")){
+                if((latitude!=0||longitude!=0)&&msg.equals("GPS")){
                     JSONObject json = new JSONObject();
                     try {
                         json.put("type", "GPS");
@@ -306,12 +306,20 @@ public class WebRtcClient {
                 }
                 else if((mSreenTrack.enabled()&&msg.equals("screen"))||(mFrontTrack.enabled()&&msg.equals("front"))||(mBackTrack.enabled()&&msg.equals("back"))){
                     switchVideoTo(msg);
+                    JSONObject json = new JSONObject();
+                    try {
+                        json.put("type", "SWITCH");
+                        json.put("msg", "succeed to switch to "+msg);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    peer.sendDataChannelMessage(json.toString());
                 }
                 else{
                     JSONObject json = new JSONObject();
                     try {
-                        json.put("type", "SUCCESS");
-                        json.put("msg", "hello,"+  entry.getKey() +"! i have received!");
+                        json.put("type", "FAIL");
+                        json.put("msg", "No permission");
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
@@ -551,6 +559,10 @@ public class WebRtcClient {
         mSreenTrack=factory.createVideoTrack(SCREEN_TRACK_ID,mScreenSource);
         mFrontTrack=factory.createVideoTrack(FRONT_TRACK_ID,mFrontSource);
         mBackTrack=factory.createVideoTrack(BACK_TRACK_ID,mBackSource);
+
+        mSreenTrack.setEnabled(false);
+        mFrontTrack.setEnabled(false);
+        mBackTrack.setEnabled(false);
 
 //        mLocalMediaStream.addTrack(mSreenTrack);
 //        mLocalMediaStream.addTrack(mFrontTrack);

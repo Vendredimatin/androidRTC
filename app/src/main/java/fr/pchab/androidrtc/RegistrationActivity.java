@@ -177,6 +177,7 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
                      mClient.setLocation(latitude,longitude);
                  } else {
                      endGPSCapture();// 关闭GPS共享
+                     mClient.setLocation(0,0);
                  }
              }
         });
