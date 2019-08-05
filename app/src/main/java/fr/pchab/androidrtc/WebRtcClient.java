@@ -526,17 +526,18 @@ public class WebRtcClient {
      * Set up the local stream and notify the signaling server.
      * Call this method after onCallReady.
      *
-     * @param name mSocket name
+     * @param info mSocket info
      */
-    public void start(String name) {
+    public void start(JSONObject info) {
         initScreenCapturStream();
-        try {
-            JSONObject message = new JSONObject();
-            message.put("name", name);
-            mSocket.emit("readyToStream", message);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
+        mSocket.emit("readyToStream",info);
+//        try {
+//            JSONObject message = new JSONObject();
+//            message.put("name", name);
+//            mSocket.emit("readyToStream", info);
+//        } catch (JSONException e) {
+//            e.printStackTrace();
+//        }
     }
 
     private void initScreenCapturStream() {

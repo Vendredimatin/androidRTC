@@ -16,4 +16,8 @@
     <string name="regport"></string>
     <string name="register">Register</string>
     <string name="punch">Fingerprint Punch</string>
+    <string name="roomID">Please input ID of the room</string>
+    <string name="registerHint">Register to room:</string>
+    <string name="roomCode">Please input code of the room</string>
+    <string name="userName">Please input name of the device</string>
 </resources>

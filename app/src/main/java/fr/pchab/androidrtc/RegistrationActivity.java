@@ -30,9 +30,10 @@ import org.json.JSONObject;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.ScreenCapturerAndroid;
-import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.VideoCapturer;
 
+import java.net.NetworkInterface;
+import java.util.Collections;
 import java.util.List;
 
 import cz.msebera.android.httpclient.Header;
@@ -50,19 +51,42 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
     private static int mMediaProjectionPermissionResultCode;
     private static final int CAPTURE_PERMISSION_REQUEST_CODE = 1;
 
-    public static String STREAM_NAME_PREFIX = "android_stream";
+    public JSONObject streamInfo=new JSONObject();
+    private static String mac;
+    static{
+        try {
+            List<NetworkInterface> all = Collections.list(NetworkInterface.getNetworkInterfaces());
+            for (NetworkInterface nif : all) {
+                if (!nif.getName().equalsIgnoreCase("wlan0")) continue;
 
+                byte[] macBytes = nif.getHardwareAddress();
+                if (macBytes == null) {
+                    break;
+                }
 
-   // public static String STREAM_NAME_PREFIX = "android_camera_stream";
-   // public static String STREAM_NAME_PREFIX = "android_camera_stream";
-   // public static String STREAM_NAME_PREFIX = "android_camera_stream";
+                StringBuilder res1 = new StringBuilder();
+                for (byte b : macBytes) {
+                    res1.append(String.format("%02X:", b));
+                }
+
+                if (res1.length() > 0) {
+                    res1.deleteCharAt(res1.length() - 1);
+                }
+                mac=res1.toString();
+                System.out.println(mac);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 
     public static int sDeviceWidth;
     public static int sDeviceHeight;
     public static final int SCREEN_RESOLUTION_SCALE = 2;
 
     private Button regButton;
-    private EditText serverEditText;
+    private EditText roomID,roomCode,userName;
     private Switch gpsSwitch,screenSwitch,frontSwitch,backSwitch;
     private Button punchButton;
 
@@ -77,7 +101,6 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
 
         super.onCreate(savedInstanceState);
         Intent intent = new Intent(this, LongRunningService.class);
@@ -100,7 +123,10 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
 
         regButton = (Button) findViewById(R.id.button);
-        serverEditText = (EditText) findViewById(R.id.edit_username);
+
+        roomID = (EditText) findViewById(R.id.edit_roomID);
+        roomCode=(EditText)findViewById(R.id.edit_roomCode);
+        userName=(EditText)findViewById(R.id.edit_userName);
 
         punchButton=(Button)findViewById(R.id.button2);
         screenSwitch=(Switch)findViewById(R.id.screenSwitch);
@@ -113,9 +139,15 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
             @Override
             public void onClick(View v) {
 
-                final String serverAddr = serverEditText.getText().toString();
+                final String id = roomID.getText().toString(),code=roomCode.getText().toString(),name=userName.getText().toString();
+                try{
+                    streamInfo.put("id",id);
+                    streamInfo.put("code",code);
+                    streamInfo.put("name",name);
+                    streamInfo.put("mac",mac);
+                }catch (Exception e){e.printStackTrace();}
 
-                if (serverAddr.isEmpty()) {
+                if (id.isEmpty()) {
                     // TODO:
                     //return;
                 }
@@ -422,9 +454,10 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     @Override
     public void onReady(String remoteId) {
-        mClient.start(STREAM_NAME_PREFIX);
-//        mWebRtcClientCamera.start(STREAM_NAME_PREFIX);
-//        mWebRtcClientScreen.start(STREAM_NAME_PREFIX);
+
+        mClient.start(streamInfo);
+//        mWebRtcClientCamera.start(STREAM_INFO);
+//        mWebRtcClientScreen.start(STREAM_INFO);
 
     }
 
