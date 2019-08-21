@@ -46,10 +46,12 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
     private WebRtcClient mWebRtcClientScreen;
     private WebRtcClient mClient;
     private double latitude=0.0,longitude =0.0;
+    private String screen="screen";
 
-    private static Intent mMediaProjectionPermissionResultData;
-    private static int mMediaProjectionPermissionResultCode;
+    private Intent mMediaProjectionPermissionResultData;
+    private int mMediaProjectionPermissionResultCode;
     private static final int CAPTURE_PERMISSION_REQUEST_CODE = 1;
+    private static final int FINGERPRINT_PUNCH_CODE=2;
 
     public JSONObject streamInfo=new JSONObject();
     private static String mac;
@@ -81,8 +83,8 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
     }
 
 
-    public static int sDeviceWidth;
-    public static int sDeviceHeight;
+    private int sDeviceWidth;
+    private int sDeviceHeight;
     public static final int SCREEN_RESOLUTION_SCALE = 2;
 
     private Button regButton;
@@ -92,7 +94,7 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     private LocationManager locationManager;
     private LocationListener locationListener;
-    private static VideoCapturer frontCapturer,backCapturer,screenCapturer;
+    private VideoCapturer frontCapturer,backCapturer,screenCapturer;
 
 
     private boolean cameraOn;
@@ -109,11 +111,12 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(
-                WindowManager.LayoutParams.FLAG_FULLSCREEN
-                        | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+//                WindowManager.LayoutParams.FLAG_FULLSCREEN
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                         | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
                         | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                         | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+
         setContentView(R.layout.activity_reg);
 
         DisplayMetrics metrics = new DisplayMetrics();
@@ -147,17 +150,13 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
                     streamInfo.put("mac",mac);
                 }catch (Exception e){e.printStackTrace();}
 
-                if (id.isEmpty()) {
-                    // TODO:
-                    //return;
-                }
 
 
                 // call register API
                 JSONObject jsonParams = new JSONObject();
                 try {
                     jsonParams.put("clientId", "andriod");
-                    jsonParams.put("devId", "screen");
+                    jsonParams.put("devId", screen);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -189,7 +188,7 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
             public void onClick(View v) {
                 Intent iExp = new Intent(RegistrationActivity.this, FingerPrintActivity.class);
 
-                startActivity(iExp);
+                startActivityForResult(iExp,FINGERPRINT_PUNCH_CODE);
 //                public static FingerprintManager getFingerprintManager(Context context) {
 //                    FingerprintManager fingerprintManager = null;
 //                    try {
@@ -216,34 +215,19 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
         screenSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked){
-                if (isChecked) {
-                    mClient.setEnabled(true,"screen");
-                }
-                else{
-                    mClient.setEnabled(false,"screen");
-                }
+                mClient.setEnabled(isChecked,screen);
             }
         });
         frontSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if(isChecked){
-                    mClient.setEnabled(true,"front");
-                }
-                else{
-                    mClient.setEnabled(false,"front");
-                }
+                mClient.setEnabled(isChecked,"front");
             }
         });
         backSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if(isChecked){
-                    mClient.setEnabled(true,"back");
-                }
-                else{
-                    mClient.setEnabled(false,"back");
-                }
+                mClient.setEnabled(isChecked,"back");
             }
         });
 /*
@@ -282,16 +266,19 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
             // Provider的状态在可用、暂时不可用和无服务三个状态直接切换时触发此函数
             @Override
             public void onStatusChanged(String provider, int status, Bundle extras) {
+                //gps changed
             }
 
             // Provider被enable时触发此函数，比如GPS被打开
             @Override
             public void onProviderEnabled(String provider) {
+                //provider enabled
             }
 
             // Provider被disable时触发此函数，比如GPS被关闭
             @Override
             public void onProviderDisabled(String provider) {
+                //provider disabled
             }
 
             //当坐标改变时触发此函数，如果Provider传进相同的坐标，它就不会被触发
@@ -424,11 +411,23 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode != CAPTURE_PERMISSION_REQUEST_CODE)
-            return;
-        mMediaProjectionPermissionResultCode = resultCode;
-        mMediaProjectionPermissionResultData = data;
-        init();
+        switch(requestCode){
+            case CAPTURE_PERMISSION_REQUEST_CODE:
+                mMediaProjectionPermissionResultCode = resultCode;
+                mMediaProjectionPermissionResultData = data;
+                init();
+                break;
+            case FINGERPRINT_PUNCH_CODE:
+//                Toast.makeText(this, String.valueOf(resultCode), Toast.LENGTH_LONG).show();
+                if(resultCode==1) {
+                    Toast.makeText(this, "succeed", Toast.LENGTH_LONG).show();
+                    mClient.sendPunch();
+                }
+                else
+                    Toast.makeText(this, "failed",Toast.LENGTH_LONG).show();
+                break;
+            default:return;
+        }
     }
 
     @Override
@@ -466,12 +465,14 @@ public class RegistrationActivity extends Activity implements WebRtcClient.RtcLi
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                //null
             }
         });
     }
 
     @Override
     public void onHandup() {
+        //null
 
     }
 

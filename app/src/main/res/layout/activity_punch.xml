@@ -1,6 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical">
+    <!--android:baselineAligned="false">-->
 
+    <android.support.v7.widget.Toolbar
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/darkGreen"
+        android:fitsSystemWindows="true"
+        android:minHeight="@android:dimen/app_icon_size"
+        app:contentInsetLeft="0dp"
+        app:contentInsetStart="0dp">
+
+        <TextView
+            android:id="@+id/punch_left_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="10dp"
+            android:drawableLeft="@mipmap/icon_left"
+            android:gravity="center"
+            android:singleLine="true"
+            android:text="返回"
+            android:textColor="#ffffff"
+            android:textSize="16sp"
+            android:visibility="visible" />
+
+        <TextView
+            android:id="@+id/punch_main_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:singleLine="true"
+            android:text="指纹验证界面"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:visibility="visible" />
+    </android.support.v7.widget.Toolbar>
+    <!--<android.support.v7.widget.Toolbar-->
+        <!--android:id="@+id/toolbar"-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:background="#3F51B5"-->
+        <!--android:minHeight="@android:dimen/app_icon_size" />-->
+
+    <TextView
+        android:id="@+id/checkHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="验证状态："
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/checkRes"
+        android:layout_width="match_parent"
+        android:layout_height="152dp"
+        android:gravity="center"
+        android:text="未验证"
+        android:textColor="#00BCD4"
+        android:textSize="30sp" />
+
+    <!--<Button-->
+        <!--android:id="@+id/btn_check"-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:text="点击此处开始验证" />-->
 </LinearLayout>

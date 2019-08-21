@@ -40,4 +40,9 @@ dependencies {
     implementation files('libs/autobanh.jar')
     implementation files('libs/base_java.jar')
     implementation files('libs/libjingle_peerconnection.jar')
+    testImplementation 'junit:junit:4.12'
+
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    }
 }

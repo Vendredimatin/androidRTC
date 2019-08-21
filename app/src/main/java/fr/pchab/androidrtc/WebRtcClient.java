@@ -21,7 +21,6 @@ import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.json.JSONString;
 import org.webrtc.AudioSource;
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
@@ -35,7 +34,6 @@ import org.webrtc.SessionDescription;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
-import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
 
 import java.net.URISyntaxException;
@@ -53,6 +51,7 @@ import com.github.nkzawa.socketio.client.Socket;
 
 public class WebRtcClient {
     private double latitude=0.0,longitude=0.0;
+    private final static String CANDIDATE_STR ="candidate", DATACHANNEL_STR ="datachannel", FRONT_STR ="front", SCREEN_STR ="screen", BACK_STR ="back";
     public void setLocation(double lat,double lon){
         latitude=lat;longitude=lon;
     }
@@ -78,6 +77,15 @@ public class WebRtcClient {
     Context mContext;
 
 
+    public void sendPunch(){
+        for (Peer peer : peers.values()) {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("type", "PUNCH");
+                peer.sendDataChannelMessage(json.toString());
+            }catch (JSONException e){e.printStackTrace();}
+        }
+    }
     public void sendGPS() {
         for (Peer peer : peers.values()) {
             peer.sendDataChannelMessage(String.valueOf(latitude)+","+String.valueOf(longitude));
@@ -142,7 +150,7 @@ public class WebRtcClient {
                 IceCandidate candidate = new IceCandidate(
                         payload.optString("id"),
                         payload.optInt("label"),
-                        payload.optString("candidate")
+                        payload.optString(CANDIDATE_STR)
                 );
                 pc.addIceCandidate(candidate);
             }
@@ -174,7 +182,7 @@ public class WebRtcClient {
             commandMap.put("init", new CreateOfferCommand());
             commandMap.put("offer", new CreateAnswerCommand());
             commandMap.put("answer", new SetRemoteSDPCommand());
-            commandMap.put("candidate", new AddIceCandidateCommand());
+            commandMap.put(CANDIDATE_STR, new AddIceCandidateCommand());
         }
 
         public Emitter.Listener onMessage = new Emitter.Listener() {
@@ -232,8 +240,8 @@ public class WebRtcClient {
 
         public Peer(String id, int endPoint) {
             Log.d(TAG, "new Peer: " + id + " " + endPoint);
-            Log.i("dataChannel", "new Peer: " + id + " " + endPoint);
-            Log.i("dataChannel", "new peerConnection: ");
+            Log.i(DATACHANNEL_STR, "new Peer: " + id + " " + endPoint);
+            Log.i(DATACHANNEL_STR, "new peerConnection: ");
 
             this.pc = factory.createPeerConnection(iceServers, mPeerConnConstraints, this);
             this.id = id;
@@ -248,8 +256,8 @@ public class WebRtcClient {
              */
             DataChannel.Init init = new DataChannel.Init();
             init.ordered = true;
-            dc = pc.createDataChannel("dataChannel", init);
-            Log.i("dataChannel", "dataChannel create");
+            dc = pc.createDataChannel(DATACHANNEL_STR, init);
+            Log.i(DATACHANNEL_STR, "dataChannel create");
         }
 
         public void sendDataChannelMessage(String message) {
@@ -270,62 +278,52 @@ public class WebRtcClient {
 
         @Override
         public void onBufferedAmountChange(long l) {
+            //null
 
         }
 
         @Override
         public void onStateChange() {
-            Log.i("dataChannel", "readyState:"+ dc.state());
+            Log.i(DATACHANNEL_STR, "readyState:"+ dc.state());
         }
 
         @Override
-        public void onMessage(DataChannel.Buffer buffer) {
-            ByteBuffer data = buffer.data;
-            byte[] bytes = new byte[data.capacity()];
-            data.get(bytes);
-            String msg = new String(bytes);
-            Log.i("dataChannel","dataChannel receive:" + msg);
-            Log.i("dataChannel", "dataChannel receive:" + msg);
-            Log.i("dataChannel", "peerSize:"+ peers.size());
-            // peers中存着远端Web的ID
-            for (Map.Entry<String,Peer> entry :peers.entrySet()) {
-                Log.i("dataChannel", "peerID:"+entry.getKey());
-                Peer peer = entry.getValue();
-                if((latitude!=0||longitude!=0)&&msg.equals("GPS")){
-                    JSONObject json = new JSONObject();
-                    try {
+        public void onMessage(DataChannel.Buffer buffer){
+            try {
+                ByteBuffer data = buffer.data;
+                byte[] bytes = new byte[data.capacity()];
+                data.get(bytes);
+                String msg = new String(bytes);
+                Log.i(DATACHANNEL_STR, "dataChannel receive:" + msg);
+                Log.i(DATACHANNEL_STR, "dataChannel receive:" + msg);
+                Log.i(DATACHANNEL_STR, "peerSize:" + peers.size());
+                // peers中存着远端Web的ID
+                for (Map.Entry<String, Peer> entry : peers.entrySet()) {
+                    Log.i(DATACHANNEL_STR, "peerID:" + entry.getKey());
+                    Peer peer = entry.getValue();
+                    if (latitude == 0 && longitude == 0) break;
+                    else if (msg.equals("GPS")) {
+                        JSONObject json = new JSONObject();
                         json.put("type", "GPS");
                         json.put("latitude", latitude);
                         json.put("longitude", longitude);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    peer.sendDataChannelMessage(json.toString());
-                    Log.i("dataChannel", latitude+","+longitude);
+                        peer.sendDataChannelMessage(json.toString());
+                        Log.i(DATACHANNEL_STR, latitude + "," + longitude);
 
-                }
-                else if((mSreenTrack.enabled()&&msg.equals("screen"))||(mFrontTrack.enabled()&&msg.equals("front"))||(mBackTrack.enabled()&&msg.equals("back"))){
-                    switchVideoTo(msg);
-                    JSONObject json = new JSONObject();
-                    try {
+                    } else if ((mSreenTrack.enabled() && msg.equals(SCREEN_STR)) || (mFrontTrack.enabled() && msg.equals(FRONT_STR)) || (mBackTrack.enabled() && msg.equals(BACK_STR))) {
+                        switchVideoTo(msg);
+                        JSONObject json = new JSONObject();
                         json.put("type", "SWITCH");
-                        json.put("msg", "succeed to switch to "+msg);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    peer.sendDataChannelMessage(json.toString());
-                }
-                else{
-                    JSONObject json = new JSONObject();
-                    try {
+                        json.put("msg", "succeed to switch to " + msg);
+                        peer.sendDataChannelMessage(json.toString());
+                    } else {
+                        JSONObject json = new JSONObject();
                         json.put("type", "FAIL");
                         json.put("msg", "No permission");
-                    } catch (JSONException e) {
-                        e.printStackTrace();
+                        peer.sendDataChannelMessage(json.toString());
                     }
-                    peer.sendDataChannelMessage(json.toString());
                 }
-            }
+            }catch (JSONException e){e.printStackTrace();}
         }
 
         //--------------------------------------------------
@@ -347,31 +345,35 @@ public class WebRtcClient {
 
         @Override
         public void onSetSuccess() {
+            //null
         }
 
         @Override
         public void onCreateFailure(String s) {
+            //null
         }
 
         @Override
         public void onSetFailure(String s) {
+            //null
         }
 
         @Override
         public void onSignalingChange(PeerConnection.SignalingState signalingState) {
+            //null
         }
 
 
         public void onIceConnectionReceivingChange(boolean var1) {
-
+            //null
         }
 
         public void onIceCandidatesRemoved(IceCandidate[] var1) {
-
+            //null
         }
 
         public void onAddTrack(RtpReceiver var1, MediaStream[] var2) {
-
+            //null
         }
 
         @Override
@@ -384,6 +386,7 @@ public class WebRtcClient {
 
         @Override
         public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) {
+            //null
         }
 
         @Override
@@ -392,8 +395,8 @@ public class WebRtcClient {
                 JSONObject payload = new JSONObject();
                 payload.put("label", candidate.sdpMLineIndex);
                 payload.put("id", candidate.sdpMid);
-                payload.put("candidate", candidate.sdp);
-                sendMessage(id, "candidate", payload);
+                payload.put(CANDIDATE_STR, candidate.sdp);
+                sendMessage(id, CANDIDATE_STR, payload);
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -415,15 +418,14 @@ public class WebRtcClient {
 
         @Override
         public void onDataChannel(DataChannel dataChannel) {
-            Log.i("dataChannel", "receive" + dataChannel.id());
+            Log.i(DATACHANNEL_STR, "receive" + dataChannel.id());
             dc = dataChannel;
             dc.registerObserver(this);
-            Log.i("dataChannel" ,"连接已建立");
+            Log.i(DATACHANNEL_STR,"连接已建立");
         }
 
         @Override
-        public void onRenegotiationNeeded() {
-
+        public void onRenegotiationNeeded() {//null
         }
 
 
@@ -577,12 +579,12 @@ public class WebRtcClient {
     }
     public void switchVideoTo(String type){
         switch (type){
-            case"screen":
+            case SCREEN_STR:
                 mLocalMediaStream.addTrack(mSreenTrack);
                 mLocalMediaStream.removeTrack(mFrontTrack);
                 mLocalMediaStream.removeTrack(mBackTrack);
                 break;
-            case"front":
+            case FRONT_STR:
                 try{backCapturer.stopCapture();}catch (Exception e){e.printStackTrace();}
                 frontCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
 //                mFrontTrack.setEnabled(true);
@@ -590,22 +592,24 @@ public class WebRtcClient {
                 mLocalMediaStream.addTrack(mFrontTrack);
                 mLocalMediaStream.removeTrack(mBackTrack);
                 break;
-            case"back":
+            case BACK_STR:
                 try{frontCapturer.stopCapture();}catch (Exception e){e.printStackTrace();}
                 backCapturer.startCapture(mPeerConnParams.videoWidth, mPeerConnParams.videoHeight, mPeerConnParams.videoFps);
                 mLocalMediaStream.removeTrack(mSreenTrack);
                 mLocalMediaStream.removeTrack(mFrontTrack);
 //                mBackTrack.setEnabled(true);
                 mLocalMediaStream.addTrack(mBackTrack);
+                break;
+            default:break;
         }
     }
     public void setEnabled(boolean b,String type){
         switch (type){
-            case "screen":
+            case SCREEN_STR:
                 mSreenTrack.setEnabled(b);break;
-            case "front":
+            case FRONT_STR:
                 mFrontTrack.setEnabled(b);break;
-            case "back":
+            case BACK_STR:
                 mBackTrack.setEnabled(b);break;
             default:break;
         }
