@@ -34,7 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:singleLine="true"
-            android:text="指纹验证界面"
+            android:text="指纹打卡界面"
             android:textColor="@android:color/white"
             android:textSize="20sp"
             android:visibility="visible" />
@@ -58,9 +58,26 @@
         android:layout_width="match_parent"
         android:layout_height="152dp"
         android:gravity="center"
-        android:text="未验证"
+        android:text="请点击下方按键开始验证"
         android:textColor="#00BCD4"
         android:textSize="30sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="top"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/bgn_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@color/lightGreen"
+            android:text="Begin"
+            android:textColor="@color/black" />
+
+    </LinearLayout>
 
     <!--<Button-->
         <!--android:id="@+id/btn_check"-->

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AndroidRTC</string>
-    <string name="host">192.168.43.232</string>
+    <string name="host">192.168.0.106</string>
     <string name="port">3000</string>
     <string name="action_settings">Options</string>
     <string name="dialog_calling">%1$s is calling ……</string>
@@ -9,9 +9,9 @@
     <string name="dialog_hangup">Hangup</string>
     <string name="front_camera">Front Camera</string>
     <string name="back_camera">Back Camera</string>
-    <string name="gps">GPS</string>
+    <string name="gps">Location</string>
     <string name="screen">Screen</string>
-    <string name="title">Register and share your devices</string>
+    <string name="title">Register and share your HW capabilities</string>
     <string name="regserver"></string>
     <string name="regport"></string>
     <string name="register">Register</string>

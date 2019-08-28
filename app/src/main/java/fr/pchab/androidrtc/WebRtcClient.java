@@ -16,12 +16,17 @@
 
 package fr.pchab.androidrtc;
 
+import android.content.Context;
 import android.util.Log;
 
+import com.github.nkzawa.emitter.Emitter;
+import com.github.nkzawa.socketio.client.IO;
+import com.github.nkzawa.socketio.client.Socket;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.webrtc.AudioSource;
+import org.webrtc.AudioTrack;
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaConstraints;
@@ -34,20 +39,12 @@ import org.webrtc.SessionDescription;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
-import org.webrtc.AudioTrack;
 
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
-
-
-import android.content.Context;
-
-import com.github.nkzawa.emitter.Emitter;
-import com.github.nkzawa.socketio.client.IO;
-import com.github.nkzawa.socketio.client.Socket;
 
 public class WebRtcClient {
     private double latitude=0.0,longitude=0.0;
@@ -572,7 +569,7 @@ public class WebRtcClient {
 //        mLocalMediaStream.addTrack(mBackTrack);
 //        mLocalMediaStream.addTrack(factory.createVideoTrack("ARDAMSv0", mVideoSource));
         mAudioSource = factory.createAudioSource(new MediaConstraints());
-        mLocalMediaStream.addTrack(factory.createAudioTrack("ARDAMSa0", mAudioSource));
+//        mLocalMediaStream.addTrack(factory.createAudioTrack("ARDAMSa0", mAudioSource));
 //        mLocalMediaStream.videoTracks.get(0).addRenderer(new VideoRenderer(mLocalRender));
 //        mListener.onLocalStream(mLocalMediaStream);
         mListener.onStatusChanged("STREAMING");

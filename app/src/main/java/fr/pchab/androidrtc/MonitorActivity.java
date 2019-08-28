@@ -3,17 +3,22 @@ package fr.pchab.androidrtc;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
+import android.os.Handler;
+import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,21 +37,18 @@ import java.util.List;
 
 import cz.msebera.android.httpclient.Header;
 
+import static android.content.ContentValues.TAG;
 
-public class FingerPrintActivity extends Activity implements WebRtcClient.RtcListener {
-    private static final String TAG = "FingerPrint";
-    private Button bgn;
-    //    private Button check;
-    private TextView checkRes,back;
-    private FingerprintManagerCompat manager;
+public class MonitorActivity extends Activity implements WebRtcClient.RtcListener {
 
     private WebRtcClient mClient;
+    private double latitude=0.0,longitude =0.0;
     private String screen="screen";
 
     private Intent mMediaProjectionPermissionResultData;
     private int mMediaProjectionPermissionResultCode;
     private static final int CAPTURE_PERMISSION_REQUEST_CODE = 1;
-    private boolean state;
+    private static final int FINGERPRINT_PUNCH_CODE=2;
 
     public JSONObject streamInfo=new JSONObject();
     private static String mac;
@@ -82,10 +84,15 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
     private int sDeviceHeight;
     public static final int SCREEN_RESOLUTION_SCALE = 2;
 
+    private Switch gpsSwitch,screenSwitch,frontSwitch,backSwitch;
+
+    private LocationManager locationManager;
+    private LocationListener locationListener;
     private VideoCapturer frontCapturer,backCapturer,screenCapturer;
 
+    private TextView back;
 
-//    private static Handler handler=new Handler();
+    private static Handler handler=new Handler();
     private void initConnection(String id,String code,String name){
         try{
             streamInfo.put("id",id);
@@ -124,10 +131,9 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
             init();
         }
     }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        state=false;
+
         super.onCreate(savedInstanceState);
         startService(new Intent(this,LongRunningService.class));
 
@@ -139,7 +145,7 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
                         | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                         | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
 
-        setContentView(R.layout.activity_punch);
+        setContentView(R.layout.activity_monitor);
 
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getRealMetrics(metrics);
@@ -147,32 +153,163 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
         sDeviceHeight = metrics.heightPixels;
 
 
-        back=(TextView)findViewById(R.id.punch_left_title);
+        screenSwitch=(Switch)findViewById(R.id.screenSwitch);
+        gpsSwitch=(Switch)findViewById(R.id.GPSSwitch);
+        frontSwitch=(Switch)findViewById(R.id.frontCameraSwitch);
+        backSwitch=(Switch)findViewById(R.id.backCameraSwitch);
+
+        back=(TextView)findViewById(R.id.monitor_left_title);
         back.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 finish();
             }
         });
-
-
-        checkRes=(TextView)findViewById(R.id.checkRes);
-        bgn=(Button)findViewById(R.id.bgn_button);
-        bgn.setOnClickListener(new View.OnClickListener() {
+        gpsSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
-            public void onClick(View v) {
-                if(!state){
-                    checkRes.setText("请将手指放置到指纹识别处进行打卡");
-                    manager.authenticate(null,0,null,new MyCallBack(),null);
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                try{
+                if (isChecked) {
+                    startGPSCapture();//打开GPS共享
+                    mClient.setLocation(latitude,longitude);
+                } else {
+                    endGPSCapture();// 关闭GPS共享
+                    mClient.setLocation(0,0);
+                }}catch (Exception e){
+                    e.printStackTrace();
                 }
             }
         });
-        manager=FingerprintManagerCompat.from(this);
-
+        screenSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked){
+                try {
+                    mClient.setEnabled(isChecked, screen);
+                }catch (Exception e){e.printStackTrace();}
+            }
+        });
+        frontSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                try {
+                    mClient.setEnabled(isChecked, "front");
+                }catch (Exception e){e.printStackTrace();}
+            }
+        });
+        backSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                try {
+                    mClient.setEnabled(isChecked, "back");
+                }catch (Exception e){e.printStackTrace();}
+            }
+        });
         Intent intent=getIntent();
         initConnection(intent.getStringExtra("roomid"),intent.getStringExtra("roomcode"),intent.getStringExtra("username"));
+/*
+        new Thread(new Runnable() {
+                  @Override
+                   public void run() {
+
+                      while(true) {
+                          Log.d("TTTTT", "executed at" + new Date().toString());
+
+                          try {
+                              URL url = new URL("http://10.150.139.20:5005/getdevsharing");
+                              HttpURLConnection connection = (HttpURLConnection)
+                                      url.openConnection();
+                              connection.setRequestMethod("GET");
+                              connection.connect();
+                              int code = connection.getResponseCode();
+                              Log.i("XXXXX", "code: " + code);
+                          } catch (IOException e) {
+                              e.printStackTrace();
+                          }
+                          sleep(1000);
+                      }
+                     }
+               }).start();
+*/
+
+
     }
 
+    private void startGPSCapture()
+            throws SecurityException{
+        //获取定位服务
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        locationListener = new LocationListener() {
+            // Provider的状态在可用、暂时不可用和无服务三个状态直接切换时触发此函数
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+                //gps changed
+            }
+
+            // Provider被enable时触发此函数，比如GPS被打开
+            @Override
+            public void onProviderEnabled(String provider) {
+                //provider enabled
+            }
+
+            // Provider被disable时触发此函数，比如GPS被关闭
+            @Override
+            public void onProviderDisabled(String provider) {
+                //provider disabled
+            }
+
+            //当坐标改变时触发此函数，如果Provider传进相同的坐标，它就不会被触发
+            @Override
+            public void onLocationChanged(Location location) {
+                if (location != null) {
+                    latitude=location.getLatitude();
+                    longitude=location.getLongitude();
+                    mClient.setLocation(latitude,longitude);
+                    Log.e("Map", "Location changed : Lat: "
+                            + location.getLatitude() + " Lng: "
+                            + location.getLongitude());
+                    mClient.sendGPS();
+                }
+            }
+        };
+        //获取当前可用的位置控制器
+        List<String> providers = locationManager.getProviders(true);
+        if(providers.size()==0){
+            Toast.makeText(this, "请检查网络或GPS是否打开",
+                    Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
+            return;
+        }
+        Location bestLocation = null;
+        String bestProvider="";
+        for (String provider : providers) {
+            Location l = locationManager.getLastKnownLocation(provider);
+            if (l == null) {
+                continue;
+            }
+            if (bestLocation == null || l.getAccuracy() < bestLocation.getAccuracy()) {
+                // Found best last known location: %s", l);
+                bestLocation = l;
+                bestProvider=provider;
+            }
+        }
+        if (bestLocation != null) {
+            //获取当前位置，这里只用到了经纬度
+            latitude=bestLocation.getLatitude();
+            longitude=bestLocation.getLongitude();
+        }
+        //绑定定位事件，监听位置是否改变
+        //第一个参数为控制器类型第二个参数为监听位置变化的时间间隔（单位：毫秒）
+        //第三个参数为位置变化的间隔（单位：米）第四个参数为位置监听器
+        locationManager.requestLocationUpdates(bestProvider, 2000, 2,locationListener);
+//        startScreenCapture();
+    }
+    private void endGPSCapture(){
+        //关闭时解除监听器
+        if (locationManager != null) {
+            locationManager.removeUpdates(locationListener);
+        }
+    }
     private void startScreenCapture() {
         MediaProjectionManager mediaProjectionManager =
                 (MediaProjectionManager) getApplication().getSystemService(
@@ -201,6 +338,7 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
         mClient=new WebRtcClient(getApplicationContext(),this,l,peerConnectionParameters);
 
     }
+
     private void initCameraCapturer(CameraEnumerator enumerator) {
         final String[] deviceNames = enumerator.getDeviceNames();
         // Trying to find a front facing camera!
@@ -225,6 +363,7 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
 
     }
 
+
     // @TargetApi(21)
     private void initScreenCapturer() {
         if (mMediaProjectionPermissionResultCode != Activity.RESULT_OK) {
@@ -247,6 +386,15 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
                 mMediaProjectionPermissionResultCode = resultCode;
                 mMediaProjectionPermissionResultData = data;
                 init();
+                break;
+            case FINGERPRINT_PUNCH_CODE:
+//                Toast.makeText(this, String.valueOf(resultCode), Toast.LENGTH_LONG).show();
+                if(resultCode==1) {
+                    Toast.makeText(this, "succeed", Toast.LENGTH_LONG).show();
+                    mClient.sendPunch();
+                }
+                else
+                    Toast.makeText(this, "failed",Toast.LENGTH_LONG).show();
                 break;
             default:return;
         }
@@ -303,32 +451,5 @@ public class FingerPrintActivity extends Activity implements WebRtcClient.RtcLis
                 Toast.makeText(getApplicationContext(), newStatus, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-    public class MyCallBack extends FingerprintManagerCompat.AuthenticationCallback{
-        private static final  String TAG="MyCallBack";
-
-
-        // 当指纹验证失败的时候会回调此函数，失败之后允许多次尝试，失败次数过多会停止响应一段时间然后再停止sensor的工作
-        @Override
-        public void onAuthenticationFailed() {
-            checkRes.setText("验证失败,请再次点击按钮尝试验证");
-            Log.d(TAG, "onAuthenticationFailed: " + "验证失败");
-        }
-
-        @Override
-        public void onAuthenticationHelp(int helpMsgId, CharSequence helpString) {
-            Log.d(TAG, "onAuthenticationHelp: " + helpString);
-        }
-
-        // 当验证的指纹成功时会回调此函数，然后不再监听指纹sensor
-        @Override
-        public void onAuthenticationSucceeded(FingerprintManagerCompat.AuthenticationResult
-                                                      result) {
-            checkRes.setText("已验证成功");
-            state=true;
-            Toast.makeText(getApplicationContext(), "succeed to punch in", Toast.LENGTH_SHORT).show();
-            mClient.sendPunch();
-            Log.d(TAG, "onAuthenticationSucceeded: " + "验证成功");
-        }
     }
 }
